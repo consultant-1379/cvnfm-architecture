@@ -1,0 +1,25 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+
+autonumber
+
+title CNF Package Delete Flow
+
+    actor EVNFMuser as "EVNFM User"
+    participant OnBoardingService as "On-boarding Service"
+    participant LicenseConsumer as "License Consumer"
+    participant TOSCAO as "TOSCA-O"
+    participant ChartRegistry as "Helm Chart Registry"
+    participant DockerRegistry as "Docker Registry"
+
+    == Delete VNF Package ==
+    EVNFMuser -> OnBoardingService: Delete CNF package
+    OnBoardingService --> LicenseConsumer: get permissions
+    OnBoardingService --> OnBoardingService: Verify package exists
+    OnBoardingService --> OnBoardingService: Verify is in NOT_IN_USE state
+    OnBoardingService --> TOSCAO: Remove Service Model
+    OnBoardingService --> ChartRegistry: Remove Charts
+    OnBoardingService --> DockerRegistry: Remove Images
+    OnBoardingService -> EVNFMuser: No Content
+
+@enduml

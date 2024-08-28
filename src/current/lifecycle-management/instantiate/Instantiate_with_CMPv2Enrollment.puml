@@ -1,0 +1,261 @@
+Title Deploy CNF with CMPv2 Online Enrollment
+actor Network Design Engineer #lightblue
+participantgroup #F0F5F4 EVNFM
+participant UI #lightblue
+participant Onboarding Service #lightblue
+participantgroup #F5F0F5 Orchestrator service
+participant ENM Service #lightblue
+participant LCM Service #lightblue
+end
+participant Crypto Service #lightblue
+participant Workflow Service #lightblue
+database Registry #lightblue
+end
+participantgroup #F8F8FF ENM
+ 
+participant CM CLI #lightblue
+participant Topology #lightblue
+end
+ 
+ 
+participant k8s Cluster #lightblue
+ 
+ 
+group #F0FFFF Prerequisites
+Network Design Engineer-->UI:Upload CNF\nPackage
+activate Network Design Engineer
+activate UI
+UI-->Onboarding Service:Package\nOnboarding
+activate Onboarding Service
+Onboarding Service-->Registry:Push \nimages
+activate Registry
+space
+deactivate Onboarding Service
+space
+destroy Onboarding Service
+deactivate Registry
+space
+destroy Registry
+end
+ 
+ 
+autonumber on
+Network Design Engineer-->UI:Deploy CNF Request:
+UI-->LCM Service:Deployment Request
+activate LCM Service
+space
+deactivate UI
+space
+ 
+ENM Service<--LCM Service:Create NE in ENM \n(OSS Parameters)
+activate ENM Service
+space
+deactivate LCM Service
+ 
+ENM Service->CM CLI:Create NE in ENM
+activate CM CLI
+ENM Service->CM CLI:Create Connectivity Information
+CM CLI-->Topology:Update Topology request
+activate Topology
+CM CLI-->ENM Service: Create NE in ENM Response
+deactivate ENM Service
+alt Create NE failed
+ENM Service-->LCM Service:Operation failed
+activate LCM Service
+LCM Service->UI: Deployment failed
+deactivate LCM Service
+activate UI
+space 
+deactivate UI
+end
+ENM Service->CM CLI:Configure security credentials
+activate ENM Service
+ENM Service->CM CLI:Add Node Security Information
+CM CLI-->Topology:Update Topology request
+deactivate Topology
+space
+destroy Topology
+CM CLI-->ENM Service: Add node to ENM Response
+deactivate ENM Service
+alt NE security configuration failed
+ENM Service-->LCM Service:Operation failed
+activate LCM Service
+LCM Service->UI: Deployment failed
+activate UI
+LCM Service->UI: Notify that NE is still\n present in ENM
+deactivate LCM Service
+deactivate UI
+end
+
+ENM Service->CM CLI:Generate CMP Enrollment Info
+activate ENM Service
+ENM Service<-CM CLI:Return Enrollment info xml file
+deactivate CM CLI
+ENM Service-->LCM Service: Return Enrollment info Response
+deactivate ENM Service
+activate LCM Service
+alt Error during enrolment info xml occured
+LCM Service->UI: Deployment failed
+activate UI
+LCM Service->UI: Notify that NE is still\n present in ENM
+deactivate UI
+end
+LCM Service-->LCM Service: Generate secret manifest
+LCM Service->Crypto Service: Encrypt sensitive data
+activate Crypto Service
+ 
+alt if error during encryption occured
+Crypto Service->LCM Service: Error occured
+LCM Service->ENM Service: Create delete Node request
+ENM Service->CM CLI: Delete Node from ENM
+activate CM CLI
+CM CLI-->ENM Service: Return response code
+deactivate CM CLI
+alt if ENM response != 0 
+ENM Service-->LCM Service: Pass error response
+deactivate ENM Service
+LCM Service->UI: Notify delete Node failed
+activate UI
+end
+LCM Service->UI: Deployment failed
+deactivate UI
+end
+ 
+ 
+Crypto Service->LCM Service:Return encrypted data
+deactivate Crypto Service
+deactivate LCM Service
+ENM Service->CM CLI:Get ENM LDAP Details
+activate ENM Service
+activate CM CLI
+space
+CM CLI->ENM Service:Return ENM LDAP Details
+deactivate CM CLI
+
+alt if LDAP Enrollment fails
+ENM Service->CM CLI: Delete Node from ENM
+activate CM CLI
+CM CLI-->ENM Service: Return response code
+deactivate CM CLI
+alt if ENM response != 0 
+ENM Service-->LCM Service: Pass error response
+deactivate ENM Service
+activate LCM Service
+LCM Service->UI: Notify delete Node failed
+activate UI
+end
+LCM Service->UI: Deployment failed
+deactivate LCM Service
+deactivate UI
+end
+
+ENM Service-->LCM Service: Return LDAP response
+activate ENM Service
+activate LCM Service
+LCM Service-->LCM Service:Generate secret manifest
+LCM Service->Crypto Service: Encrypt sensitive data
+activate Crypto Service
+alt if error during encryption occured
+Crypto Service->LCM Service: Error occured
+LCM Service->ENM Service: Create delete Node request
+ENM Service->CM CLI: Delete Node from ENM
+activate CM CLI
+CM CLI-->ENM Service: Return response code
+deactivate CM CLI
+alt if ENM response != 0 
+ENM Service-->LCM Service: Pass error response
+deactivate ENM Service
+LCM Service->UI: Notify delete Node failed
+activate UI
+end
+LCM Service->UI: Deployment failed
+deactivate UI
+end
+ 
+Crypto Service->LCM Service:Return encrypted data
+deactivate Crypto Service
+LCM Service->LCM Service:Create WFS Install request
+LCM Service->Workflow Service:Send WFS Install request
+activate Workflow Service
+Workflow Service->Crypto Service: Decrypt sensetive data
+activate Crypto Service
+alt if error during decryption occured
+Crypto Service->LCM Service: Error occured
+deactivate LCM Service
+
+LCM Service->ENM Service: Create delete Node request
+activate ENM Service
+ENM Service->CM CLI: Delete Node from ENM
+activate CM CLI
+CM CLI-->ENM Service: Return response code
+deactivate CM CLI
+alt if ENM response != 0 
+ENM Service-->LCM Service: Pass error response
+deactivate ENM Service
+activate LCM Service
+
+LCM Service->UI: Notify delete Node failed
+activate UI
+end
+LCM Service->UI: Deployment failed
+deactivate LCM Service
+deactivate UI
+end
+Crypto Service->Workflow Service: Return decrytpted data
+deactivate Crypto Service
+Workflow Service->k8s Cluster:Create k8s secret for LDAP
+activate k8s Cluster
+Workflow Service->k8s Cluster:Create k8s secret for CMP
+Workflow Service-->k8s Cluster:Install CRD's for CRD namespase
+Workflow Service-->k8s Cluster:Install FUU's for FUU namespace
+Workflow Service-->k8s Cluster:Validate Deployment
+Workflow Service-->LCM Service: Return validation response
+activate LCM Service
+ 
+alt If validation did not pass
+ENM Service->CM CLI:Delete NE from ENM
+activate ENM Service
+activate CM CLI
+CM CLI-->ENM Service: Return response code
+deactivate CM CLI
+alt if ENM response != 0 
+ENM Service-->LCM Service: Pass error response
+deactivate ENM Service
+LCM Service->UI: Notify delete Node failed
+activate UI
+end
+UI<-LCM Service:Deployment Failed
+
+deactivate UI
+end
+ 
+Workflow Service->k8s Cluster:Remove Secrets
+deactivate Workflow Service
+deactivate k8s Cluster
+ 
+alt If validation passed
+ENM Service<--LCM Service:Trigger O&M Supervision \nand model sync (NE Name)
+activate ENM Service
+deactivate LCM Service
+ENM Service->CM CLI:Activate Supervision and trigger sync (cmedit set)
+activate CM CLI
+CM CLI-->ENM Service: Return activate supervision response
+alt activate supervision failed
+ENM Service->CM CLI: Delete Node from ENM
+
+CM CLI-->ENM Service: Return response code
+deactivate CM CLI
+alt if ENM response != 0 
+ENM Service-->LCM Service: Pass error response
+deactivate ENM Service
+activate LCM Service
+LCM Service->UI: Notify delete Node failed
+activate UI
+end
+LCM Service->UI: Deployment failed
+end
+LCM Service->UI: Deployment Successful
+space
+deactivate UI
+deactivate LCM Service
+end

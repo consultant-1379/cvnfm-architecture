@@ -1,0 +1,18 @@
+modelVersion: 2.0
+
+properties:
+  - docker-image-path: armdocker.rnd.ericsson.se/proj-eo/common/
+  - docker-image-name: eric-eo-cvnfm-architecture-builder
+
+docker-images:
+  - doc-builder: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/bob-docbuilder:latest
+  - asciidocbuilder: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/bob-asciidocbuilder
+  - architecture-builder: ${docker-image-path}${docker-image-name}
+
+rules:
+  build:
+  - task: build-builder
+    cmd: docker build --tag ${docker-image-path}${docker-image-name}:latest scripts/
+  - task: generate-images
+    docker-image: architecture-builder
+    cmd: java -jar /notagtool/asciidoc-8.6.9/etc/asciidoc/filters/plantuml/plantuml.jar src/**/**.puml -png

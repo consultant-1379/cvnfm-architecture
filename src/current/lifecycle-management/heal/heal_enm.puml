@@ -1,0 +1,79 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+
+autonumber
+
+title CNF Heal via Ericsson Network Manager Flow
+
+    actor EVNFMuser as "EVNFM User"
+    participant Orchestrator as "Orchestrator Service"
+    participant ENM as "Ericsson Network Manager"
+    participant WFS as "Workflow Service"
+    participant Cluster as "K8S Cluster"
+
+
+
+    == Heal ==
+    EVNFMuser -> Orchestrator: Heal CNF
+    Orchestrator -> Orchestrator: Validate additional params for Heal
+    Orchestrator -> EVNFMuser: Accepted
+    Orchestrator -> ENM: Download enrollment info
+    ENM -> Orchestrator: Return file with enrollment info
+    Orchestrator -> ENM: Get LDAP details
+    ENM -> Orchestrator:  Return LDAP details
+    Orchestrator -> Orchestrator: Generate OSS node protocol file
+    Orchestrator -> ENM: Check alarm supervision
+    ENM -> Orchestrator:  Return enabled/disabled
+    group If supervision is enabled
+    Orchestrator -> ENM: Disable alarm supervision
+    end
+    loop For each release in parallel
+    Orchestrator -> WFS: Terminate release
+    WFS -> Orchestrator: Accepted
+    WFS -> Cluster: Uninstall release
+    WFS -> Cluster: Verify release uninstalled
+    WFS --> Orchestrator: Notify that release is uninstalled
+    Orchestrator -> WFS: Delete PVC
+    WFS -> Orchestrator: Accepted
+    WFS -> Cluster: Delete PVC by label
+    WFS --> Orchestrator: Notify that PVC are deleted
+    end
+    Orchestrator -> WFS: Delete namespace
+    WFS -> Orchestrator: Accepted
+    WFS -> Cluster: Delete namespace
+    WFS --> Orchestrator: Notify that namespace is deleted
+    Orchestrator -> Orchestrator: Add combined values
+    Orchestrator -> Orchestrator: Build day0 secrets out of OSS node protocol file
+    loop For each release subsequently
+    Orchestrator -> WFS: Install release
+    WFS -> Cluster: Create secrets
+    WFS -> Cluster: Install release
+    WFS -> Cluster: Verify release installed
+    WFS -> Cluster: Delete secrets
+    WFS -> Orchestrator: Notify that release is installed
+    end
+    Orchestrator -> WFS: Get all secrets for namespace
+    Orchestrator -> Orchestrator: Encrypt and save unseal key secret
+    Orchestrator -> WFS: Patch unseal key secret with new value
+    WFS -> Cluster: Replace secret`s value
+    WFS -> Orchestrator: Accepted
+    alt If restore from Latest backup
+    Orchestrator -> ENM: Restore from latest backup
+    ENM -> Orchestrator: Accepted
+    else If restore from specific backup
+    Orchestrator -> ENM: Import backup
+    ENM -> Orchestrator: Action created
+    loop Until timeout expired
+    Orchestrator ->  ENM: check import progress
+    end
+    Orchestrator -> ENM: Restore from backup
+    ENM -> Orchestrator: Accepted
+    end
+    Orchestrator -> ENM: Check alarm supervision
+    ENM -> Orchestrator:  Return enabled/disabled
+    group If supervision is disabled
+    Orchestrator -> ENM: Enable alarm supervision
+    end
+    Orchestrator -> Orchestrator: Persist data on Completed
+
+@enduml

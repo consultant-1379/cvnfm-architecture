@@ -1,0 +1,22 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+
+autonumber
+
+title CISM Cluster Register Flow
+
+    actor EVNFMuser as "EVNFM User"
+    participant OrchestratorService as "Orchestrator Service"
+    participant LicenseConsumer as "License Consumer"
+    participant WFS as "Workflow Service"
+
+
+
+    == Register CISM Cluster ==
+    EVNFMuser -> OrchestratorService: Register cluster
+    OrchestratorService --> LicenseConsumer: get permissions
+    OrchestratorService --> WFS: Get Cluster Server Details
+    OrchestratorService --> OrchestratorService: Save Cluster config
+    OrchestratorService -> EVNFMuser: Created
+
+@enduml

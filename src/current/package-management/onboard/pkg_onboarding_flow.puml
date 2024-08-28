@@ -1,0 +1,37 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+
+autonumber
+
+title CNF Package Onboarding Flow
+
+    actor EVNFMuser as "EVNFM User"
+    participant OnBoardingService as "On-boarding Service"
+    participant LicenseConsumer as "License Consumer"
+    participant TOSCAO as "TOSCA-O"
+    participant ChartRegistry as "Helm Chart Registry"
+    participant DockerRegistry as "Docker Registry"
+
+
+    == Create VNF Package ==
+    EVNFMuser -> OnBoardingService: Create CNF package
+    OnBoardingService --> LicenseConsumer: get permissions
+    OnBoardingService --> OnBoardingService: Persist package details
+    OnBoardingService -> EVNFMuser: Created
+
+    == Upload VNF Package content ==
+    EVNFMuser -> OnBoardingService: Upload CNF package content
+    OnBoardingService --> LicenseConsumer: get permissions
+    OnBoardingService --> OnBoardingService: Save package content
+    OnBoardingService -> EVNFMuser: Accepted
+    OnBoardingService --> OnBoardingService: Unpack ZIP
+    OnBoardingService --> OnBoardingService: Verify CSAR signature
+    OnBoardingService --> OnBoardingService: Unpack CSAR
+    OnBoardingService --> OnBoardingService: Verify Manifest signature
+    OnBoardingService --> OnBoardingService: Validate package content
+    OnBoardingService --> TOSCAO: Create Service Model
+    OnBoardingService --> ChartRegistry: Push Helm charts
+    OnBoardingService --> DockerRegistry: Push Docker images
+    OnBoardingService --> OnBoardingService: Persist package details
+
+@enduml

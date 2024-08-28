@@ -1,0 +1,82 @@
+@startuml
+
+title NBI Paging decision logic
+
+start
+
+note
+The client is expected to keep sending new requests
+until they receive a nextpage_opaque_token in the response.
+If no token is received, that signals that it is the last page.
+endnote
+
+note
+NBI's nextpage_opaque_token should consist of 2 parts
+1. Orchestrator service nextpage_opaque_token
+2. VM VNFM nextpage_opaque_token.
+Example: nextpage_opaque_marker=vmvnfm-<token>-cvnfm-<token>
+endnote
+
+:Receive request;
+:Get pagesize from request;
+switch (nextpage_opaque_token in request has subtokens)
+case (null)
+
+  :Send request to Orchestrator with pagesize / 2;
+  :Send request to VM VNFM with pagesize / 2;
+case (cvnfm & vmvnfm)
+  :Send request to Orchestrator with pagesize / 2;
+  :Send request to VM VNFM with pagesize / 2;
+case (cvnfm)
+  :Send request to Orchestrator with pagesize;
+case (vmvnfm)
+  :Send request to VM VNFM with pagesize;
+endswitch
+
+partition "Merge tokens" {
+  if (VM VNFM response contains nextpage_opaque_token) then (yes)
+  :Set VM VNFM specific subtoken in NBI response to the value of VM VNFM response;
+  else (no)
+  :Set VM VNFM specific subtoken in NBI response to null;
+  endif
+  if (CVNFM response contains nextpage_opaque_token) then (yes)
+  :Set CM VNFM specific subtoken in NBI response to the value of CNFM response;
+  else (no)
+  :Set CNFM specific subtoken in NBI response to null;
+  endif
+  if (One or more of the subtokens is not null) then (yes)
+  :Send nextpage_opaque_token with NBI response;
+  else (no)
+  :Do not send nextpage_opaque_token;
+  endif
+}
+stop
+
+partition "Pagination implementation in Orch/VM VNFM" {
+note
+nextpage_opaque_token shall contain a single integer
+endnote
+start
+: Apply some kind of sorting to all DB records
+that is repeatable for the next request producing the same order
+Referred to as records[] below;
+if (nextpage_opaque_token in request exists) then (no)
+:nextpage_opaque_token set to 1;
+else (yes)
+endif
+:First record on the page should be records[nextpage_opaque_token-1];
+if (recrods[].length > nextpage_opaque_token + pagesize) then (yes)
+:Last record to be sent back should be
+ records[nextpage_opaque_token + pagesize -1];
+:Response should have a new nextpage_opaque_token
+ new_nextpage_opaque_token = nextpage_opaque_token + pagesize + 1;
+else (no)
+:Last record to be sent back should be records[recrods[].length - 1];
+:Response should not have nextpage_opaque_token;
+endif
+
+:nextpage_opaque_token = last record index + 1;
+stop
+}
+
+@enduml
